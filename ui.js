@@ -37,6 +37,7 @@
     let pendingPromotion = null; // { move } waiting for piece choice
     let aiThinking = false;
     let gameOver = false;
+    let drag = null;             // active drag: { r, c, startX, startY, active, ghost }
 
     const PLAYER_NAMES = {
         ai: { w: 'White (AI)', b: 'Black (AI)' },
@@ -60,6 +61,7 @@
         selected = null;
         legalTargets = [];
         pendingPromotion = null;
+        drag = null;
         aiThinking = false;
         gameOver = false;
         hidePromotionModal();
@@ -172,6 +174,7 @@
                 }
 
                 sq.addEventListener('click', () => onSquareClick(r, c));
+                sq.addEventListener('pointerdown', (e) => onPointerDown(r, c, e));
                 boardEl.appendChild(sq);
             }
         }
@@ -285,31 +288,111 @@
         return colorSelect.value === state.turn;
     }
 
+    /* ------------------------- Drag & drop ------------------------- */
+    const DRAG_THRESHOLD = 5; // px of movement before a drag starts
+
+    function onPointerDown(r, c, ev) {
+        if (aiThinking || pendingPromotion || gameOver) return;
+        if (!isHumanTurn()) return;
+        const pieceOn = state.board[r][c];
+        if (!pieceOn || pieceOn.color !== state.turn) return;
+
+        // Pre-select the piece and compute legal targets (shared with click).
+        selected = { r, c };
+        legalTargets = legalMovesFor(state.board, r, c, state.castling);
+        if (legalTargets.length === 0) return; // not a movable piece; let click logic run
+
+        drag = { r, c, startX: ev.clientX, startY: ev.clientY, active: false, ghost: null };
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+        window.addEventListener('pointercancel', onDragCancel);
+        ev.preventDefault(); // keep click intact is fine; prevents native image/drag quirks
+    }
+
+    function onPointerMove(ev) {
+        if (!drag) return;
+        const dx = ev.clientX - drag.startX;
+        const dy = ev.clientY - drag.startY;
+
+        if (!drag.active && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+            drag.active = true;
+            const p = state.board[drag.r][drag.c];
+            drag.ghost = document.createElement('div');
+            drag.ghost.className = 'piece-ghost piece ' + (p.color === 'w' ? 'white-piece' : 'black-piece');
+            drag.ghost.textContent = GLYPHS[p.color][p.type];
+            document.body.appendChild(drag.ghost);
+            // reveal legal targets while dragging
+            boardEl.classList.add('dragging');
+            render();
+        }
+        if (drag.active && drag.ghost) {
+            drag.ghost.style.transform =
+                'translate(' + (ev.clientX) + 'px,' + (ev.clientY) + 'px)';
+        }
+    }
+
+    function onPointerUp(ev) {
+        if (!drag) return;
+        const d = drag;
+        drag = null;
+        detachDragListeners();
+
+        if (d.ghost) { d.ghost.remove(); d.ghost = null; }
+        boardEl.classList.remove('dragging');
+
+        if (!d.active) {
+            // Pure click (no movement): selection was set in onPointerDown;
+            // the click event will drive the move. Nothing else to do.
+            return;
+        }
+
+        const t = hitTestSquare(ev.clientX, ev.clientY);
+        const moved = t ? attemptMoveTo(t.r, t.c) : false;
+        if (!moved) {
+            selected = null;
+            legalTargets = [];
+            render();
+        }
+    }
+
+    function onDragCancel(ev) {
+        if (!drag) return;
+        drag = null;
+        detachDragListeners();
+        boardEl.classList.remove('dragging');
+        selected = null;
+        legalTargets = [];
+        render();
+    }
+
+    function detachDragListeners() {
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onDragCancel);
+    }
+
+    // Convert a client (viewport) point into board coordinates {r, c} or null.
+    function hitTestSquare(clientX, clientY) {
+        const rect = boardEl.getBoundingClientRect();
+        if (clientX < rect.left || clientX > rect.right ||
+            clientY < rect.top || clientY > rect.bottom) return null;
+        const size = rect.width / 8;
+        const d = Math.floor((clientY - rect.top) / size);
+        const e = Math.floor((clientX - rect.left) / size);
+        return {
+            r: boardFlipped ? 7 - d : d,
+            c: boardFlipped ? 7 - e : e
+        };
+    }
+
     function onSquareClick(r, c) {
         if (aiThinking) return;
         if (!isHumanTurn()) return;
 
         const piece = state.board[r][c];
 
-        // Clicking a target -> make the move
-        const targetMove = legalTargets.find(m => m.toR === r && m.toC === c);
-        if (targetMove) {
-            if (targetMove.flags.promote) {
-                // Multiple variants for the same destination; open modal
-                const variants = legalTargets.filter(m => m.toR === r && m.toC === c && m.flags.promote);
-                pendingPromotion = {
-                    fromR: targetMove.fromR, fromC: targetMove.fromC,
-                    toR: r, toC: c,
-                    captured: targetMove.captured,
-                    flags: { ...targetMove.flags }
-                };
-                // Remember original square for re-selection after modal
-                openPromotionModal(variants);
-                return;
-            }
-            doMove(targetMove);
-            return;
-        }
+        // Clicking a target -> make the move (shared with drag-and-drop).
+        if (attemptMoveTo(r, c)) return;
 
         // Otherwise (re)select own piece
         if (piece && piece.color === state.turn) {
@@ -321,6 +404,28 @@
             legalTargets = [];
             render();
         }
+    }
+
+    // Execute a move to the given square if it's a legal target of the currently
+    // selected piece. Returns true if the move (or promotion) was started.
+    function attemptMoveTo(toR, toC) {
+        if (!selected) return false;
+        const targetMove = legalTargets.find(m => m.toR === toR && m.toC === toC);
+        if (!targetMove) return false;
+
+        if (targetMove.flags.promote) {
+            const variants = legalTargets.filter(m => m.toR === toR && m.toC === toC && m.flags.promote);
+            pendingPromotion = {
+                fromR: targetMove.fromR, fromC: targetMove.fromC,
+                toR: toR, toC: toC,
+                captured: targetMove.captured,
+                flags: { ...targetMove.flags }
+            };
+            openPromotionModal(variants);
+            return true;
+        }
+        doMove(targetMove);
+        return true;
     }
 
     function doMove(move) {
