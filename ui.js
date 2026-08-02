@@ -66,6 +66,9 @@
         updatePlayerCards();
         render();
         updateStatus();
+        // If the AI side is to move first (AI == White, human == Black),
+        // start the AI turn. maybeAiTurn() no-ops when it's the human's turn.
+        maybeAiTurn();
     }
 
     // FEN-like key uniquely identifying a position (board + turn + rights + ep).
@@ -121,7 +124,7 @@
                 const piece = state.board[r][c];
                 if (piece) {
                     const span = document.createElement('span');
-                    span.className = 'piece ' + piece.color + '-piece';
+                    span.className = 'piece ' + (piece.color === 'w' ? 'white-piece' : 'black-piece');
                     span.textContent = GLYPHS[piece.color][piece.type];
                     sq.appendChild(span);
                 }
