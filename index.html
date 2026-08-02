@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Chess - Full Rules & AI</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>♟️ Master Chess</h1>
+            <p class="subtitle">Complete Rules • AI Opponent • Move History</p>
+        </header>
+
+        <div class="controls-bar">
+            <div class="control-group">
+                <label for="game-mode">Mode:</label>
+                <select id="game-mode">
+                    <option value="ai">Play vs Computer</option>
+                    <option value="pvp">Pass & Play (2 Player)</option>
+                </select>
+            </div>
+
+            <div class="control-group" id="ai-difficulty-group">
+                <label for="ai-difficulty">AI Level:</label>
+                <select id="ai-difficulty">
+                    <option value="1">Easy</option>
+                    <option value="2" selected>Medium</option>
+                    <option value="3">Hard</option>
+                </select>
+            </div>
+
+            <div class="control-group" id="player-color-group">
+                <label for="player-color">Play As:</label>
+                <select id="player-color">
+                    <option value="w" selected>White</option>
+                    <option value="b">Black</option>
+                </select>
+            </div>
+
+            <div class="button-group">
+                <button id="new-game-btn" class="btn btn-primary">New Game</button>
+                <button id="undo-btn" class="btn btn-secondary">Undo</button>
+                <button id="flip-board-btn" class="btn btn-secondary">Flip Board</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="game-panel board-section">
+                <!-- Top Player Info (Black by default) -->
+                <div class="player-card" id="top-player-card">
+                    <div class="player-info">
+                        <span class="player-avatar" id="top-player-avatar">🏿</span>
+                        <span class="player-name" id="top-player-name">Black (AI)</span>
+                    </div>
+                    <div class="captured-pieces" id="top-captured"></div>
+                </div>
+
+                <!-- Chess Board -->
+                <div class="board-wrapper">
+                    <div id="chessboard" class="chessboard"></div>
+                </div>
+
+                <!-- Bottom Player Info (White by default) -->
+                <div class="player-card" id="bottom-player-card">
+                    <div class="player-info">
+                        <span class="player-avatar" id="bottom-player-avatar">🏻</span>
+                        <span class="player-name" id="bottom-player-name">White (You)</span>
+                    </div>
+                    <div class="captured-pieces" id="bottom-captured"></div>
+                </div>
+            </div>
+
+            <div class="game-panel sidebar-section">
+                <div class="status-card">
+                    <h3>Game Status</h3>
+                    <div id="status-message" class="status-message">White's turn</div>
+                    <div id="check-alert" class="check-alert hidden">CHECK!</div>
+                </div>
+
+                <div class="history-card">
+                    <h3>Move Log</h3>
+                    <div class="moves-container" id="moves-log">
+                        <table class="moves-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>White</th>
+                                    <th>Black</th>
+                                </tr>
+                            </thead>
+                            <tbody id="moves-list"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Promotion Modal -->
+    <div id="promotion-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Choose Promotion Piece</h3>
+            <div class="promotion-choices" id="promotion-choices">
+                <button class="promo-btn" data-piece="q">♛ Queen</button>
+                <button class="promo-btn" data-piece="r">♜ Rook</button>
+                <button class="promo-btn" data-piece="b">♝ Bishop</button>
+                <button class="promo-btn" data-piece="n">♞ Knight</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="chess.js"></script>
+    <script src="ui.js"></script>
+</body>
+</html>
